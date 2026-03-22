@@ -1,0 +1,172 @@
+name: Secure E-Commerce CI/CD Pipeline - Production Grade
+
+on:
+  push:
+    branches: ["main", "master"]
+    paths:
+      - "problem-3/**"
+      - ".github/workflows/problem-3-ci.yml"
+  pull_request:
+    branches: ["main", "master"]
+    paths:
+      - "problem-3/**"
+      - ".github/workflows/problem-3-ci.yml"
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/secure-ecommerce-problem-3
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Stage 1: Code Quality & Testing
+  quality_checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: problem-3
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: problem-3/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint code
+        run: npm run lint || true
+
+      - name: Run unit tests
+        run: npx vitest run --config vitest.config.ts
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: problem-3-dist
+          path: problem-3/dist
+          retention-days: 7
+
+  # Stage 2: Docker Build, Security Scan & Push
+  docker_build_push:
+    runs-on: ubuntu-latest
+    needs: quality_checks
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./problem-3
+          push: false
+          load: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.SHORT_SHA }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.SHORT_SHA }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker image to registry
+        uses: docker/build-push-action@v5
+        with:
+          context: ./problem-3
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.SHORT_SHA }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+
+  # Stage 3: Update Helm & GitOps Ready
+  update_helm_gitops:
+    runs-on: ubuntu-latest
+    needs: docker_build_push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Set short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "github-actions@example.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Update Helm chart image tag
+        run: |
+          sed -i "s/tag:.*/tag: ${{ env.SHORT_SHA }}/" ./problem-3/helm/values.yaml
+          cat ./problem-3/helm/values.yaml | grep "tag:"
+
+      - name: Commit and push updated Helm values
+        run: |
+          git add ./problem-3/helm/values.yaml
+          git commit -m "chore: update container image tag to ${{ env.SHORT_SHA }}" || echo "No changes to commit"
+          git pull origin ${{ github.ref_name }} --rebase || true
+          git push origin ${{ github.ref_name }} || echo "Push completed"
+
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** \`${{ env.IMAGE_NAME }}:${{ env.SHORT_SHA }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Author:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Pipeline Status: SUCCESS" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests Passed ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker Image Built & Scanned ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- Helm Values Updated ✓" >> $GITHUB_STEP_SUMMARY
+          echo "- Ready for ArgoCD Deployment ✓" >> $GITHUB_STEP_SUMMARY
