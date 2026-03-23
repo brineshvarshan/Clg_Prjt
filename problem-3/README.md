@@ -27,7 +27,7 @@ npm run build
 
 
 ## Preview the production build locally:
-
+cs
 serve -s dist
 
 
