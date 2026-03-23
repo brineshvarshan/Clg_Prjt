@@ -12,9 +12,10 @@ jobs:
       - name: Checkout main repo
         uses: actions/checkout@v4
 
-      - name: Clone monitoring repo
+      - name: Clone and copy monitoring repo
         run: |
           git clone https://github.com/brineshvarshan/AI-assited-devops.git temp
+          mkdir -p monitoring-agent
           cp -r temp/* monitoring-agent/
           rm -rf temp
 
@@ -22,7 +23,6 @@ jobs:
         run: |
           git config user.email "github-actions@github.com"
           git config user.name "github-actions[bot]"
-          mkdir -p monitoring-agent
           git add .
           git commit -m "feat: add monitoring agent" || echo "nothing to commit"
           git push origin master
