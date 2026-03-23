@@ -1,0 +1,28 @@
+name: Copy monitoring agent
+
+on:
+  workflow_dispatch:
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      - name: Clone monitoring repo
+        run: |
+          git clone https://github.com/brineshvarshan/AI-assited-devops.git temp
+          cp -r temp/* monitoring-agent/
+          rm -rf temp
+
+      - name: Push to repo
+        run: |
+          git config user.email "github-actions@github.com"
+          git config user.name "github-actions[bot]"
+          mkdir -p monitoring-agent
+          git add .
+          git commit -m "feat: add monitoring agent" || echo "nothing to commit"
+          git push origin master
