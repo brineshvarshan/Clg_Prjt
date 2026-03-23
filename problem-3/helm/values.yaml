@@ -6,7 +6,7 @@ replicaCount: 2
 image:
   repository: cowar/secure-ecommerce-problem-3
   pullPolicy: IfNotPresent
-  tag: "latest"  # Updated by CI/CD pipeline
+  tag: 9f6ebe6
 
 imagePullSecrets: []
 nameOverride: ""
