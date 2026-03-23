@@ -4,7 +4,7 @@ This is a React application that can be run locally for development, tested with
 
 ---
 
-## 🚀 Development
+## 🚀    Development
 
 Start the app in development mode with hot reload:
 
