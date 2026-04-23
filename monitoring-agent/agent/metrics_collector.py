@@ -1,6 +1,6 @@
 import requests
 
-PROMETHEUS_URL = "http://prometheus-kube-prometheus-prometheus.default.svc.cluster.local:9090"
+PROMETHEUS_URL = "http://localhost:9090"
 
 
 def query_prometheus(query):

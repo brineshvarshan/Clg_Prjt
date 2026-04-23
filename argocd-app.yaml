@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/brineshvarshan/Clg_Prjt.git
-    targetRevision: main
+    targetRevision: master
     path: problem-3/helm
   destination:
     server: https://kubernetes.default.svc
