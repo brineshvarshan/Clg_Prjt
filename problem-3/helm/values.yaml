@@ -6,7 +6,7 @@ replicaCount: 2
 image:
   repository: brinesh/secure-ecommerce-problem-3
   pullPolicy: IfNotPresent
-  tag: latest
+  tag: 2c6111e
 
 imagePullSecrets: []
 nameOverride: ""

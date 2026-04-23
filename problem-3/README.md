@@ -11,7 +11,7 @@ Start the app in development mode with hot reload:
 npm run dev
 
 The app will be available at http://localhost:5173
- (default Vite port).
+ (default Vite port).fsd
 
  ## 🧪 Testing
 
